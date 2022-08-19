@@ -915,22 +915,30 @@ async function PixitInC(val, type)
 async function formatPixit(val, type, options)
 {
   const pixitInC = await PixitInC.call(this, val, type);
-  if (StringHelper.isOctetString(type)) {
-    if (options.hash.useSpans) {
-      // This will currently do weird things if the pixit is a hex string. So...don't do that.
-      return `chip::ByteSpan(chip::Uint8::from_const_char(${pixitInC}.c_str()), ${pixitInC}.length())`;
-    } else {
-      return `${pixitInC}.c_str()`;
-    }
-  } else if (StringHelper.isCharString(type)) {
-    if (options.hash.useSpans) {
-      // This should be the UTF-8 encode length, but it's just the length. So, don't use weird chars.
-      return `chip::CharSpan(${pixitInC}.c_str(), ${pixitInC}.length())`;
+  if (StringHelper.isString(type)) {
+    const nsstring = `[NSString stringWithUTF8String:${pixitInC}.c_str()]`;
+    if (options.hash.useSpansforStrings) {
+      if (StringHelper.isOctetString(type)) {
+        // This will currently do weird things if the pixit is a hex string. So...don't do that.
+        return `chip::ByteSpan(chip::Uint8::from_const_char(${pixitInC}.c_str()), ${pixitInC}.length())`;
+      } else {
+        // This should be the UTF-8 encode length, but it's just the length. So, don't use weird chars.
+        return `chip::CharSpan(${pixitInC}.c_str(), ${pixitInC}.length())`;
+      }
+    } else if (options.hash.useNSStringForStrings) {
+      return nsstring;
+    } else if (options.hash.useNSDataForStrings) {
+      return `[${nsstring} dataUsingEncoding:NSUTF8StringEncoding]`;
     } else {
       return `${pixitInC}.c_str()`;
     }
   } else {
-    return pixitInC;
+    if (options.hash.useNSNumberForNumbers) {
+      const numbertype = await darwinHelper.asObjectiveCNumberType.call(this, val, type, false);
+      return `[NSNumber numberWith${numbertype}:${pixitInC}]`;
+    } else {
+      return pixitInC;
+    }
   }
 }
 
